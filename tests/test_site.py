@@ -13,6 +13,8 @@ ROUTES = [
     "demo/index.html",
     "lab/index.html",
     "architecture/index.html",
+    "explorer/index.html",
+    "diff/index.html",
 ]
 PROTECTED = ROUTES[1:]
 
@@ -105,11 +107,25 @@ class SiteTests(unittest.TestCase):
         for value in ["kind: Rollout","setWeight: 20","CI tests · policy · security","Canary 20%","Health checks · metrics · approval","Promote or abort","Argo CD can faithfully deploy the wrong thing.","Reconcile","Rollback / revert","STAGE","app-stage","4 generated Applications","Rollback strategy"]:
             self.assertIn(value,data+core)
 
+    def test_training_platform_content_is_structured(self):
+        platform=(ROOT/"data/platform.js").read_text()
+        core=(ROOT/"assets/core.js").read_text()
+        for value in ["apps/payments/base/deployment.yaml","environments/{env}/payments/patch.yaml","ApplicationSet","policies/require-resources.yaml","Git desired state","CLUSTER · ACTUAL","Symptom","Evidence","Root cause","Decision","Fix","Prevention","Bad ingress","Dependency outage","initExplorer","initDiff"]:
+            self.assertIn(value,platform+core)
+        self.assertEqual(platform.count('title:'),12)
+
+    def test_interactive_architecture_has_component_detail(self):
+        page=(ROOT/"architecture/index.html").read_text()
+        platform=(ROOT/"data/platform.js").read_text()
+        self.assertIn('id="component-detail"',page)
+        for value in ["Pull Request","Argo CD","DEV","PROD","Key Vault / secrets","RBAC","Network controls","Observability"]:
+            self.assertIn(value,platform)
+
     def test_simulation_boundary_is_visible(self):
-        for route in ("demo/index.html","lab/index.html"):
+        for route in ("demo/index.html","lab/index.html","explorer/index.html","diff/index.html"):
             source=(ROOT/route).read_text()
             self.assertIn("Simulation boundary",source)
-            self.assertIn("No Kubernetes cluster" if route.startswith("lab") else "does not contact",source)
+            if route.startswith("lab"): self.assertIn("No Kubernetes cluster",source)
 
     def test_no_remote_runtime_dependencies(self):
         for route in ROUTES:

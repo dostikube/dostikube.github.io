@@ -12,14 +12,16 @@ This is intentionally a client-side presentation gate. It is not secure authenti
 
 - `/` — presenter access gate.
 - `/portal/` — presenter command center.
-- `/presentation/` — six-screen talk covering Git → Argo CD, the Application manifest, reconciliation, drift, and enterprise architecture.
+- `/presentation/` — nine-screen talk covering Git → Argo CD, progressive delivery, drift, operating boundaries, and enterprise architecture.
 - `/demo/` — interactive desired-versus-actual state and reconciliation simulation.
-- `/lab/` — drift, bad-image, manual-change, and expired-secret simulations.
-- `/architecture/` — enterprise delivery path and surrounding controls.
+- `/lab/` — twelve guided failure scenarios from symptom through prevention.
+- `/architecture/` — inspectable enterprise delivery path and surrounding controls.
+- `/explorer/` — environment-aware GitOps repository and YAML explorer.
+- `/diff/` — desired-versus-actual state diff simulator.
 
 ## Architecture
 
-The site uses plain HTML, CSS, and JavaScript without a build dependency. `data/talk.js` holds the structured talk, architecture, demo, and incident content. `assets/core.js` implements the access flow, presentation, demo, architecture, and deterministic lab state. `assets/guard.js` performs the synchronous client-side route check.
+The site uses plain HTML, CSS, and JavaScript without a build dependency. `data/talk.js` holds the structured talk. `data/platform.js` holds repository examples, diffs, failure cases, and architecture component details. `assets/core.js` implements the access flow and deterministic interactions. `assets/guard.js` performs the synchronous client-side route check.
 
 ## Run locally
 
@@ -36,6 +38,7 @@ python3 -m unittest discover -s tests -v
 node --check assets/core.js
 node --check assets/guard.js
 node --check data/talk.js
+node --check data/platform.js
 ```
 
 ## Deployment
@@ -50,7 +53,7 @@ Real in this static prototype:
 - logout and protected-route redirects;
 - keyboard and button presentation controls;
 - responsive architecture diagrams and YAML views;
-- deterministic demo and incident transitions.
+- deterministic demo, diff, code-explorer, architecture, and incident transitions.
 
 Simulated:
 

@@ -2,6 +2,7 @@
   "use strict";
 
   const TALK = window.DOSTI_TALK;
+  const PLATFORM = window.DOSTI_PLATFORM || {};
   const ACCESS_CODE = "Dosti123";
   const ACCESS_KEY = "dostikube-access";
   const $ = (selector, root = document) => root.querySelector(selector);
@@ -113,71 +114,29 @@
     render();
   }
 
-  const initialLabStates = {
-    drift: {status:"OutOfSync",good:false,git:"replicas: 3",cluster:"replicas: 1",log:["Drift detected: replicas differ from Git."],action:"Reconcile"},
-    image: {status:"PR ready",good:false,git:"image: app:v41",cluster:"image: app:v41 · Healthy",log:["PR proposes image: app:v42"],action:"Merge and sync"},
-    manual: {status:"Synced",good:true,git:"limits.cpu: 500m",cluster:"limits.cpu: 500m",log:["No drift detected."],action:"Run kubectl change"},
-    secret: {status:"Synced / app error",good:false,git:"Deployment: Healthy",cluster:"Authentication: failed",log:["Pod readiness: passing","Application authentication: failed","Credential: expired"],action:"Inspect evidence"}
-  };
-
-  function freshLabStates() {
-    return JSON.parse(JSON.stringify(initialLabStates));
-  }
-
   function initLab() {
     initProtected();
-    let active = "drift";
-    const states = freshLabStates();
+    let active = PLATFORM.failures[0].id;
+    let revealed = 0;
     const tabs = $("#scenario-tabs");
     const copy = $("#scenario-copy");
     const simulation = $("#sim");
-    tabs.innerHTML = TALK.scenarios.map((scenario) => `<button class="scenario-tab" data-id="${scenario.id}">${scenario.label} · ${escape(scenario.title)}</button>`).join("");
+    tabs.innerHTML = PLATFORM.failures.map((scenario, index) => `<button class="scenario-tab" data-id="${scenario.id}">${String(index + 1).padStart(2,"0")} · ${escape(scenario.title)}</button>`).join("");
 
     function render() {
-      const scenario = TALK.scenarios.find((item) => item.id === active);
-      const state = states[active];
+      const scenario = PLATFORM.failures.find((item) => item.id === active);
+      const steps = [["Symptom",scenario.symptom],["Evidence",scenario.evidence],["Root cause",scenario.rootCause],["Decision",scenario.decision],["Fix",scenario.fix],["Prevention",scenario.prevention]];
       $$(".scenario-tab", tabs).forEach((tab) => tab.classList.toggle("active", tab.dataset.id === active));
-      copy.innerHTML = `<p class="eyebrow">Scenario ${scenario.label}</p><h2>${escape(scenario.title)}</h2><p class="lead">${escape(scenario.summary)}</p><p>${escape(scenario.lesson)}</p>`;
-      simulation.innerHTML = `<span class="badge ${state.good ? "good" : "bad"}">ARGO CD · ${escape(state.status)}</span><div class="state-grid"><div class="state-card"><strong>Git · desired</strong><code>${escape(state.git)}</code></div><div class="state-card"><strong>Cluster · actual</strong><code>${escape(state.cluster)}</code></div></div><div class="event-log">${state.log.map((entry) => `<div>› ${escape(entry)}</div>`).join("")}</div><div class="sim-actions"><button class="btn" id="act">${escape(state.action)}</button><button class="btn secondary" id="reset">Reset</button></div>${active === "image" ? '<div class="decision"><p class="eyebrow">Promotion and rollback control</p><button data-choice>Gate production promotion</button><button data-choice>Rollback through Git</button><button data-choice>Pause automatic sync</button></div>' : ""}`;
-      $("#act").addEventListener("click", act);
-      $("#reset").addEventListener("click", reset);
-      $$("[data-choice]", simulation).forEach((button) => button.addEventListener("click", () => button.classList.toggle("chosen")));
-    }
-
-    function reset() {
-      states[active] = freshLabStates()[active];
-      render();
-    }
-
-    function act() {
-      const state = states[active];
-      if (active === "drift") {
-        Object.assign(state, {status:"Synced / Healthy",good:true,cluster:"replicas: 3",action:"Reconciled"});
-        state.log.push("Argo applied replicas: 3.", "Health check passed.");
-      }
-      if (active === "image") {
-        Object.assign(state, {status:"Degraded",git:"image: app:v42",cluster:"image: app:v42 · health check failed",action:"Retry rollout"});
-        state.log.push("PR merged.", "Argo synced app:v42.", "Kubernetes health check failed.", "Decision required: rollback or gate promotion.");
-      }
-      if (active === "manual") {
-        if (state.status === "Synced") {
-          Object.assign(state, {status:"OutOfSync",good:false,cluster:"limits.cpu: 100m",action:"Reconcile"});
-          state.log.push("kubectl changed production.", "Audit event recorded.", "Drift detected.");
-        } else {
-          Object.assign(state, {status:"Synced / Healthy",good:true,cluster:"limits.cpu: 500m",action:"Reconciled"});
-          state.log.push("Argo restored the reviewed CPU limit.");
-        }
-      }
-      if (active === "secret") {
-        state.log.push("Objects match Git.", "Credential expired outside the deployment lifecycle.", "Rotate the secret and verify identity, network, and application paths.");
-        state.action = "Evidence collected";
-      }
-      render();
+      copy.innerHTML = `<p class="eyebrow">Failure lab</p><h2>${escape(scenario.title)}</h2><p class="lead">Work the incident from observation to prevention.</p><p class="muted">Reveal one decision layer at a time instead of jumping straight to the fix.</p>`;
+      simulation.innerHTML = `<div class="failure-timeline">${steps.map(([label,value],index) => `<article class="failure-step ${index <= revealed ? "revealed" : "locked"}"><span>${String(index + 1).padStart(2,"0")} · ${label}</span><p>${index <= revealed ? escape(value) : "Evidence hidden"}</p></article>`).join("")}</div><div class="sim-actions"><button class="btn" id="reveal" ${revealed >= steps.length - 1 ? "disabled" : ""}>${revealed >= steps.length - 1 ? "Scenario complete" : `Reveal ${steps[revealed + 1][0]}`}</button><button class="btn secondary" id="reset">Reset</button></div>`;
+      $("#reveal").addEventListener("click", () => { revealed = Math.min(steps.length - 1, revealed + 1); render(); });
+      $("#reset").addEventListener("click", () => { revealed = 0; render(); });
     }
 
     tabs.addEventListener("click", (event) => {
       if (event.target.dataset.id) {
         active = event.target.dataset.id;
+        revealed = 0;
         render();
       }
     });
@@ -220,8 +179,68 @@
 
   function initArchitecture() {
     initProtected();
-    $("#enterprise-architecture").innerHTML = `<div class="architecture-path">${TALK.enterpriseFlow.map(node).join("")}</div><div class="control-plane"><p class="eyebrow">Enterprise controls surrounding the path</p><div class="controls-ring">${TALK.controls.map((control) => `<span class="control-chip">${escape(control)}</span>`).join("")}</div></div>`;
+    const root = $("#enterprise-architecture");
+    const detail = $("#component-detail");
+    const controls = ["Key Vault / secrets","RBAC","Network controls","Observability"];
+    root.innerHTML = `<div class="architecture-path interactive-path">${TALK.enterpriseFlow.map((item) => `<button class="node component-node" data-component="${escape(item)}">${escape(item)}</button>`).join("")}</div><div class="control-plane"><p class="eyebrow">Inspect a surrounding control</p><div class="controls-ring">${controls.map((item) => `<button class="control-chip component-node" data-component="${escape(item)}">${escape(item)}</button>`).join("")}</div></div>`;
+    function show(name) {
+      const component = PLATFORM.components[name] || {purpose:"Part of the reviewed delivery path.",config:"Ownership and configuration depend on the platform design.",failure:"A weak boundary can interrupt or bypass delivery."};
+      $$("[data-component]",root).forEach((button) => button.classList.toggle("active",button.dataset.component === name));
+      detail.innerHTML = `<p class="eyebrow">Selected component</p><h2>${escape(name)}</h2><div class="component-facts"><div><b>What it does</b><p>${escape(component.purpose)}</p></div><div><b>Configuration</b><p>${escape(component.config)}</p></div><div><b>Failure mode</b><p>${escape(component.failure)}</p></div></div>`;
+    }
+    root.addEventListener("click", (event) => { const button=event.target.closest("[data-component]"); if(button) show(button.dataset.component); });
+    show("Argo CD");
   }
 
-  window.Dosti = {initAccess, initProtected, initPresentation, initLab, initDemo, initArchitecture};
+  function environmentYaml(name) {
+    const env = PLATFORM.environments[name];
+    return `apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: payments\nspec:\n  replicas: ${env.replicas}\n  template:\n    spec:\n      containers:\n        - name: payments\n          image: ${env.image}\n          resources:\n            requests:\n              cpu: ${env.cpu}\n# automated sync: ${env.autoSync}`;
+  }
+
+  function initExplorer() {
+    initProtected();
+    let environment = "prod";
+    let activePath = "environments/prod/payments/patch.yaml";
+    const tabs = $("#environment-tabs");
+    const tree = $("#repo-tree");
+    const code = $("#file-code");
+    const meta = $("#file-meta");
+    const impact = $("#file-impact");
+    tabs.innerHTML = Object.keys(PLATFORM.environments).map((name) => `<button data-env="${name}">${name.toUpperCase()}</button>`).join("");
+    function resolvedFiles() {
+      return PLATFORM.files.map((file) => file.template ? {...file,path:file.path.replace("{env}",environment),content:environmentYaml(environment)} : file);
+    }
+    function renderTree() {
+      const files = resolvedFiles();
+      if (!files.some((file) => file.path === activePath)) activePath = `environments/${environment}/payments/patch.yaml`;
+      tree.innerHTML = `<div class="tree-root">gitops/</div>${files.map((file) => `<button class="tree-file ${file.path === activePath ? "active" : ""}" data-path="${escape(file.path)}"><span>◇</span>${escape(file.path)}</button>`).join("")}`;
+      $$("[data-env]",tabs).forEach((button) => button.classList.toggle("active",button.dataset.env === environment));
+      const file = files.find((item) => item.path === activePath);
+      meta.innerHTML = `<span>gitops / ${escape(file.path)}</span><span class="ui-badge ok">${environment.toUpperCase()}</span>`;
+      code.textContent = file.content;
+      impact.innerHTML = `<div><b>What Argo reads</b><p>${escape(file.role)}</p></div><div><b>What failure looks like</b><p>${escape(file.failure)}</p></div>`;
+    }
+    tabs.addEventListener("click", (event) => { if(event.target.dataset.env){ environment=event.target.dataset.env; activePath=`environments/${environment}/payments/patch.yaml`; renderTree(); }});
+    tree.addEventListener("click", (event) => { const button=event.target.closest("[data-path]"); if(button){ activePath=button.dataset.path; renderTree(); }});
+    renderTree();
+  }
+
+  function initDiff() {
+    initProtected();
+    let active = PLATFORM.diffs[0].id;
+    const tabs = $("#diff-tabs");
+    const workbench = $("#diff-workbench");
+    tabs.innerHTML = PLATFORM.diffs.map((item) => `<button class="scenario-tab" data-id="${item.id}">${escape(item.label)}</button>`).join("");
+    function render() {
+      const item = PLATFORM.diffs.find((candidate) => candidate.id === active);
+      $$(".scenario-tab",tabs).forEach((button) => button.classList.toggle("active",button.dataset.id === active));
+      const changed = item.desired !== item.actual;
+      const diff = changed ? `<span class="diff-minus">- ${escape(item.actual)}</span>\n<span class="diff-plus">+ ${escape(item.desired)}</span>` : `<span class="diff-neutral">No Kubernetes object diff</span>`;
+      workbench.innerHTML = `<div class="diff-header"><div><span class="mock-logo">ARGO CD DIFF</span><b>${escape(item.label)}</b></div><span class="ui-badge ${changed ? "warn" : "ok"}">${escape(item.status)}</span></div><div class="diff-columns"><article><span>GIT · DESIRED</span><pre>${escape(item.desired)}</pre></article><article><span>CLUSTER · ACTUAL</span><pre>${escape(item.actual)}</pre></article></div><pre class="unified-diff">${diff}</pre><div class="diff-explanation"><b>${changed ? "Drift detected" : "Objects match; investigate outside desired state"}</b><p>${escape(item.reason)}</p><a class="btn secondary" href="../demo/">Open reconciliation demo →</a></div>`;
+    }
+    tabs.addEventListener("click", (event) => { if(event.target.dataset.id){ active=event.target.dataset.id; render(); }});
+    render();
+  }
+
+  window.Dosti = {initAccess, initProtected, initPresentation, initLab, initDemo, initArchitecture, initExplorer, initDiff};
 })();
