@@ -27,6 +27,7 @@ jobs:
           node-version: "22"
       - run: python3 tests/test_site.py
       - run: node --check assets/core.js
+      - run: node --check assets/guard.js
       - run: node --check data/talk.js
   deploy:
     needs: validate

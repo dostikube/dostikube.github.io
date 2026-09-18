@@ -6,22 +6,35 @@ import re
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-ROUTES = ["index.html", "presentation/index.html", "lab/index.html", "live/index.html", "presenter/index.html"]
+ROUTES = [
+    "index.html",
+    "portal/index.html",
+    "presentation/index.html",
+    "demo/index.html",
+    "lab/index.html",
+    "architecture/index.html",
+]
+PROTECTED = ROUTES[1:]
 
 class Page(HTMLParser):
     def __init__(self):
-        super().__init__(); self.links=[]; self.h1=0; self.ids=[]
+        super().__init__(); self.links=[]; self.ids=[]; self.scripts=[]
     def handle_starttag(self, tag, attrs):
-        a=dict(attrs)
-        if tag == "h1": self.h1 += 1
-        if "id" in a: self.ids.append(a["id"])
+        values=dict(attrs)
+        if "id" in values: self.ids.append(values["id"])
         if tag in ("a", "link", "script", "img"):
-            value=a.get("href",a.get("src",""))
+            value=values.get("href",values.get("src",""))
             if value: self.links.append(value)
+        if tag == "script" and values.get("src"): self.scripts.append(values["src"])
 
 class SiteTests(unittest.TestCase):
     def test_required_routes_exist(self):
         for route in ROUTES: self.assertTrue((ROOT/route).is_file(), route)
+
+    def test_removed_audience_routes_and_qr_runtime(self):
+        self.assertFalse((ROOT/"live/index.html").exists())
+        self.assertFalse((ROOT/"presenter/index.html").exists())
+        self.assertFalse((ROOT/"assets/qrcode.min.js").exists())
 
     def test_local_assets_resolve_and_ids_are_unique(self):
         for route in ROUTES:
@@ -34,22 +47,39 @@ class SiteTests(unittest.TestCase):
                 if not url.path or url.path.endswith("/"): target/= "index.html"
                 self.assertTrue(target.exists(),(route,link))
 
-    def test_content_model_has_required_talk_and_scenarios(self):
+    def test_every_protected_route_loads_guard_first(self):
+        for route in PROTECTED:
+            page=Page(); page.feed((ROOT/route).read_text())
+            self.assertTrue(page.scripts, route)
+            self.assertEqual(page.scripts[0], "../assets/guard.js", route)
+
+    def test_access_model_is_session_scoped_and_disclosed(self):
+        core=(ROOT/"assets/core.js").read_text()
+        guard=(ROOT/"assets/guard.js").read_text()
+        home=(ROOT/"index.html").read_text()
+        self.assertIn('ACCESS_CODE = "Dosti123"',core)
+        self.assertIn("sessionStorage.setItem",core)
+        self.assertIn("sessionStorage.removeItem",core)
+        self.assertIn("sessionStorage.getItem",guard)
+        self.assertIn("not secure authentication",home)
+        self.assertNotIn("localStorage",core+guard)
+
+    def test_content_model_has_required_flows_and_scenarios(self):
         text=(ROOT/"data/talk.js").read_text()
-        for value in ["GITOPS26", "Before GitOps", "Operating model", "Enterprise architecture", "Configuration drift", "Bad image deployment", "Expired secret", "Manual production change"]:
+        for value in ["Feature branch","Pull Request","CI validation","Security / policy","Protected main","Git configuration repository","Argo CD","Kubernetes","GitHub Enterprise","DEV","TEST","STAGING","PROD","Entra ID","Change management","Configuration drift","Bad image release","Manual production change","Expired secret"]:
             self.assertIn(value,text)
-        self.assertEqual(len(re.findall(r'id: "(?:opening|before|model|enterprise|lab)"',text)),5)
+        self.assertEqual(len(re.findall(r'id:"(?:drift|image|manual|secret)"',text)),4)
 
     def test_simulation_boundary_is_visible(self):
-        lab=(ROOT/"lab/index.html").read_text()
-        self.assertIn("No Kubernetes cluster",lab)
-        self.assertIn("deterministic browser state",lab)
-        self.assertIn("No response is transmitted",(ROOT/"live/index.html").read_text())
+        for route in ("demo/index.html","lab/index.html"):
+            source=(ROOT/route).read_text()
+            self.assertIn("Simulation boundary",source)
+            self.assertIn("No Kubernetes cluster" if route.startswith("lab") else "does not contact",source)
 
     def test_no_remote_runtime_dependencies(self):
         for route in ROUTES:
             page=Page(); page.feed((ROOT/route).read_text())
-            remote=[x for x in page.links if urlsplit(x).scheme in ("http","https") and x != "https://dostikube.github.io/"]
+            remote=[link for link in page.links if urlsplit(link).scheme in ("http","https") and link != "https://dostikube.github.io/"]
             self.assertEqual(remote,[],(route,remote))
 
 if __name__ == "__main__": unittest.main()
