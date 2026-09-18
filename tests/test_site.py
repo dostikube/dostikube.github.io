@@ -69,6 +69,8 @@ class SiteTests(unittest.TestCase):
         for value in ["Developer","Git repository","GitOps manifests","Argo CD Application","Kubernetes cluster","Pull Request","Branch Protection","CI / Security / Policy","GitOps Repository","Argo CD","GitHub Enterprise","DEV","TEST","PROD","Entra ID","Key Vault / secrets","Configuration drift","Bad image release","Manual production change","Expired secret"]:
             self.assertIn(value,text)
         self.assertEqual(len(re.findall(r'id:"(?:drift|image|manual|secret)",label:',text)),4)
+        slides=text.split("  scenarios:",1)[0]
+        self.assertEqual(len(re.findall(r'id:"(?:opening|why|source|git-to-argo|application|sync|drift|enterprise)"',slides)),8)
 
     def test_application_manifest_explains_required_fields(self):
         text=(ROOT/"data/talk.js").read_text()
@@ -78,8 +80,17 @@ class SiteTests(unittest.TestCase):
     def test_reconcile_demo_has_manual_change_and_reconcile_actions(self):
         source=(ROOT/"demo/index.html").read_text()
         core=(ROOT/"assets/core.js").read_text()
-        for value in ["manual-change","reconcile","replicas: 3","clusterReplicas = 1","OUT OF SYNC","SYNCED / HEALTHY"]:
+        for value in ["manual-change","reconcile","replicas: 3","clusterReplicas = 1","OutOfSync","Synced / Healthy"]:
             self.assertIn(value,source+core)
+
+    def test_visual_model_uses_documented_argo_concepts(self):
+        core=(ROOT/"assets/core.js").read_text()
+        data=(ROOT/"data/talk.js").read_text()
+        presentation=(ROOT/"presentation/index.html").read_text()
+        for value in ["github-window","argo-window","resource-tree","+ New App","ApplicationSet","Synced","OutOfSync","Healthy","Degraded","View YAML"]:
+            self.assertIn(value,core+data)
+        self.assertIn("01 / 08",presentation)
+        self.assertGreaterEqual(data.count("https://argo-cd.readthedocs.io/"),8)
 
     def test_simulation_boundary_is_visible(self):
         for route in ("demo/index.html","lab/index.html"):
