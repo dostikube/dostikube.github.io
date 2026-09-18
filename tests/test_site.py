@@ -66,9 +66,20 @@ class SiteTests(unittest.TestCase):
 
     def test_content_model_has_required_flows_and_scenarios(self):
         text=(ROOT/"data/talk.js").read_text()
-        for value in ["Feature branch","Pull Request","CI validation","Security / policy","Protected main","Git configuration repository","Argo CD","Kubernetes","GitHub Enterprise","DEV","TEST","STAGING","PROD","Entra ID","Change management","Configuration drift","Bad image release","Manual production change","Expired secret"]:
+        for value in ["Developer","Git repository","GitOps manifests","Argo CD Application","Kubernetes cluster","Pull Request","Branch Protection","CI / Security / Policy","GitOps Repository","Argo CD","GitHub Enterprise","DEV","TEST","PROD","Entra ID","Key Vault / secrets","Configuration drift","Bad image release","Manual production change","Expired secret"]:
             self.assertIn(value,text)
-        self.assertEqual(len(re.findall(r'id:"(?:drift|image|manual|secret)"',text)),4)
+        self.assertEqual(len(re.findall(r'id:"(?:drift|image|manual|secret)",label:',text)),4)
+
+    def test_application_manifest_explains_required_fields(self):
+        text=(ROOT/"data/talk.js").read_text()
+        for value in ["apiVersion: argoproj.io/v1alpha1","kind: Application","repoURL:","targetRevision:","path:","destination:","namespace:","syncPolicy:"]:
+            self.assertIn(value,text)
+
+    def test_reconcile_demo_has_manual_change_and_reconcile_actions(self):
+        source=(ROOT/"demo/index.html").read_text()
+        core=(ROOT/"assets/core.js").read_text()
+        for value in ["manual-change","reconcile","replicas: 3","clusterReplicas = 1","OUT OF SYNC","SYNCED / HEALTHY"]:
+            self.assertIn(value,source+core)
 
     def test_simulation_boundary_is_visible(self):
         for route in ("demo/index.html","lab/index.html"):

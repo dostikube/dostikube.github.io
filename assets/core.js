@@ -45,7 +45,12 @@
 
   function visual(slide) {
     if (slide.kind === "chaos") return `<div class="diagram chaos-grid">${slide.points.map(node).join("")}</div>`;
-    if (slide.kind === "flow") return `<div class="diagram">${flowMarkup(slide.flow)}<div class="legend"><div><b>Git</b>desired state</div><div><b>Kubernetes</b>actual state</div><div><b>Argo CD</b>reconciliation</div></div></div>`;
+    if (slide.kind === "flow" || slide.kind === "primary-flow") return `<div class="diagram">${flowMarkup(slide.flow)}<div class="legend"><div><b>Git</b>desired state</div><div><b>Kubernetes</b>actual state</div><div><b>Argo CD</b>reconciliation</div></div></div>`;
+    if (slide.kind === "application") return `<div class="application-layout"><pre class="terminal application-yaml">${escape(TALK.applicationManifest)}</pre><div class="field-guide">${TALK.applicationFields.map((field) => `<div><code>${escape(field.name)}</code><span>${escape(field.value)}</span></div>`).join("")}</div></div>`;
+    if (slide.kind === "synced-state" || slide.kind === "drift-state") {
+      const synced = slide.kind === "synced-state";
+      return `<div class="diagram"><span class="badge ${synced ? "good" : "bad"}">ARGO CD · ${synced ? "SYNCED / HEALTHY" : "OUT OF SYNC"}</span><div class="state-grid"><div class="state-card"><strong>Git · desired</strong><code>replicas: 3</code></div><div class="state-card"><strong>Kubernetes · actual</strong><code>replicas: ${synced ? "3" : "1"}</code></div></div></div>`;
+    }
     if (slide.kind === "states") return `<div class="diagram state-comparison"><div class="state-card"><strong>Git · desired</strong><code>replicas: 3</code></div><div class="reconcile-loop">observe<br>↻<br>reconcile</div><div class="state-card"><strong>Kubernetes · actual</strong><code>replicas: 1</code></div></div>`;
     if (slide.kind === "enterprise") return `<div class="diagram">${flowMarkup(slide.flow)}<div class="controls-ring">${slide.controls.map((control) => `<span class="control-chip">${escape(control)}</span>`).join("")}</div></div>`;
     if (slide.kind === "lab") return `<div class="diagram"><pre class="terminal">${escape(slide.yaml)}</pre><a class="btn amber lab-link" href="../lab/">Open failure lab →</a></div>`;
@@ -162,18 +167,34 @@
   function initDemo() {
     initProtected();
     const flow = $("#demo-flow");
+    const comparison = $("#reconcile-demo");
     const events = $("#demo-events");
-    const next = $("#demo-next");
-    let step = -1;
-    flow.innerHTML = TALK.demoSteps.map((item, index) => `<div class="demo-node" data-step="${index}"><span>${String(index + 1).padStart(2, "0")}</span>${escape(item.label)}</div>`).join("");
+    const manual = $("#manual-change");
+    const reconcile = $("#reconcile");
+    let clusterReplicas = 3;
+    flow.innerHTML = TALK.primaryFlow.map(node).join("");
     function render() {
-      $$(".demo-node", flow).forEach((item, index) => item.classList.toggle("active", index <= step));
-      events.innerHTML = TALK.demoSteps.slice(0, step + 1).map((item) => `<div>› ${escape(item.event)}</div>`).join("") || "Waiting for a reviewed change…";
-      next.textContent = step < 0 ? "Start change" : step < TALK.demoSteps.length - 1 ? "Next event" : "Flow complete";
-      next.disabled = step >= TALK.demoSteps.length - 1;
+      const synced = clusterReplicas === 3;
+      comparison.innerHTML = `<span class="badge ${synced ? "good" : "bad"}">ARGO CD · ${synced ? "SYNCED / HEALTHY" : "OUT OF SYNC"}</span><div class="state-grid"><div class="state-card"><strong>Git · desired state</strong><code>replicas: 3</code></div><div class="state-card"><strong>Kubernetes · actual state</strong><code>replicas: ${clusterReplicas}</code></div></div>`;
+      manual.disabled = !synced;
+      reconcile.disabled = synced;
     }
-    next.addEventListener("click", () => { step += 1; render(); });
-    $("#demo-reset").addEventListener("click", () => { step = -1; render(); });
+    manual.addEventListener("click", () => {
+      clusterReplicas = 1;
+      events.innerHTML = "<div>› kubectl scaled the workload to one replica.</div><div>› Argo CD detected drift from Git.</div>";
+      render();
+    });
+    reconcile.addEventListener("click", () => {
+      clusterReplicas = 3;
+      events.innerHTML += "<div>› Argo CD reapplied replicas: 3.</div><div>› Application returned to SYNCED / HEALTHY.</div>";
+      render();
+    });
+    $("#demo-reset").addEventListener("click", () => {
+      clusterReplicas = 3;
+      events.textContent = "Waiting for a manual cluster change…";
+      render();
+    });
+    events.textContent = "Waiting for a manual cluster change…";
     render();
   }
 

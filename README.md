@@ -12,8 +12,8 @@ This is intentionally a client-side presentation gate. It is not secure authenti
 
 - `/` — presenter access gate.
 - `/portal/` — presenter command center.
-- `/presentation/` — six-screen interactive talk.
-- `/demo/` — deterministic Git → Argo CD → Kubernetes walkthrough.
+- `/presentation/` — six-screen talk covering Git → Argo CD, the Application manifest, reconciliation, drift, and enterprise architecture.
+- `/demo/` — interactive desired-versus-actual state and reconciliation simulation.
 - `/lab/` — drift, bad-image, manual-change, and expired-secret simulations.
 - `/architecture/` — enterprise delivery path and surrounding controls.
 
