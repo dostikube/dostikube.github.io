@@ -15,6 +15,7 @@ ROUTES = [
     "architecture/index.html",
     "explorer/index.html",
     "diff/index.html",
+    "learn/index.html",
 ]
 PROTECTED = ROUTES[1:]
 
@@ -112,7 +113,19 @@ class SiteTests(unittest.TestCase):
         core=(ROOT/"assets/core.js").read_text()
         for value in ["apps/payments/base/deployment.yaml","environments/{env}/payments/patch.yaml","ApplicationSet","policies/require-resources.yaml","Git desired state","CLUSTER · ACTUAL","Symptom","Evidence","Root cause","Decision","Fix","Prevention","Bad ingress","Dependency outage","initExplorer","initDiff"]:
             self.assertIn(value,platform+core)
-        self.assertEqual(platform.count('title:'),12)
+        failures=platform.split("  failures:",1)[1].split("  learningTracks:",1)[0]
+        self.assertEqual(failures.count('title:'),12)
+
+    def test_guided_learning_is_structured_and_session_scoped(self):
+        platform=(ROOT/"data/platform.js").read_text()
+        core=(ROOT/"assets/core.js").read_text()
+        page=(ROOT/"learn/index.html").read_text()
+        for value in ["Beginner GitOps","Argo CD Operator","Enterprise GitOps","Troubleshooting","Developer","Platform Engineer","Architect","SRE","Production readiness","initLearning","dostikube-learning-progress","Decision challenge"]:
+            self.assertIn(value,platform+core+page)
+        self.assertEqual(platform.count('competency:'),4)
+        self.assertEqual(platform.count('correct:true'),4)
+        self.assertIn("sessionStorage.setItem(PROGRESS_KEY",core)
+        self.assertNotIn("localStorage",core)
 
     def test_interactive_architecture_has_component_detail(self):
         page=(ROOT/"architecture/index.html").read_text()

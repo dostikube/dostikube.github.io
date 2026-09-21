@@ -33,6 +33,51 @@ window.DOSTI_PLATFORM = {
     {id:"ingress",title:"Bad ingress",symptom:"The rollout is healthy but users receive routing errors.",evidence:"DNS and ingress host do not match the committed hostname.",rootCause:"The desired route is wrong for the environment.",decision:"Treat runtime reachability as a promotion signal.",fix:"Correct the host or network configuration through Git.",prevention:"Add synthetic reachability tests after deployment."},
     {id:"dependency",title:"Dependency outage",symptom:"Pods are ready but requests fail downstream.",evidence:"Traces show timeouts to the payment database.",rootCause:"An external dependency is unavailable.",decision:"Choose failover, degradation, or rollback based on impact.",fix:"Restore or fail over the dependency; deployment sync may remain unchanged.",prevention:"Design dependency SLOs, resilience, and recovery runbooks."}
   ],
+  learningTracks: [
+    {id:"beginner",title:"Beginner GitOps",role:"Developer",summary:"Build the mental model from repository intent to reconciliation.",challenge:"desired-state",modules:[
+      {id:"repo-basics",title:"Read the GitOps repository",route:"../explorer/",tool:"Explorer",outcome:"Locate shared state and environment overlays."},
+      {id:"see-drift",title:"Compare desired and actual state",route:"../diff/",tool:"Diff",outcome:"Explain what OutOfSync means."},
+      {id:"reconcile",title:"Restore reviewed intent",route:"../demo/",tool:"Demo",outcome:"Run the replicas 3 → 1 → 3 loop."}
+    ]},
+    {id:"operator",title:"Argo CD Operator",role:"Platform Engineer",summary:"Operate Applications, sync state, health, and recovery decisions.",challenge:"synced-degraded",modules:[
+      {id:"application-spec",title:"Inspect the Application contract",route:"../presentation/?slide=4",tool:"Presentation",outcome:"Trace source, revision, path, and destination."},
+      {id:"operator-diffs",title:"Classify six forms of drift",route:"../diff/",tool:"Diff",outcome:"Separate object drift from runtime failure."},
+      {id:"operator-failures",title:"Diagnose controller and workload failures",route:"../lab/",tool:"Failure Lab",outcome:"Work evidence before choosing a fix."}
+    ]},
+    {id:"enterprise",title:"Enterprise GitOps",role:"Architect",summary:"Design promotion, controls, evidence, and recovery around reconciliation.",challenge:"production-promotion",modules:[
+      {id:"control-path",title:"Inspect the enterprise delivery path",route:"../architecture/",tool:"Architecture",outcome:"Assign ownership to each control boundary."},
+      {id:"applicationset",title:"Trace multi-environment generation",route:"../explorer/",tool:"Explorer",outcome:"Explain DEV, TEST, STAGE, and PROD generation."},
+      {id:"operating-boundaries",title:"Define what GitOps does not solve",route:"../presentation/?slide=7",tool:"Presentation",outcome:"Connect platform controls to GitOps boundaries."}
+    ]},
+    {id:"troubleshooting",title:"Troubleshooting",role:"SRE",summary:"Use symptoms, evidence, and branching decisions to recover safely.",challenge:"runtime-secret",modules:[
+      {id:"failure-triage",title:"Triage twelve incidents",route:"../lab/",tool:"Failure Lab",outcome:"Move from symptom to prevention."},
+      {id:"runtime-vs-sync",title:"Separate sync from runtime health",route:"../diff/",tool:"Diff",outcome:"Recognize a matching object with a broken dependency."},
+      {id:"rollback-reconcile",title:"Choose rollback or reconciliation",route:"../presentation/?slide=5",tool:"Presentation",outcome:"Explain how the desired target changes."}
+    ]}
+  ],
+  challenges: {
+    "desired-state":{competency:"Reconciliation",prompt:"Git says replicas: 3. Production has replicas: 1 after a manual patch. What do you do first?",choices:[
+      {text:"Confirm Git is still correct, then reconcile",correct:true,outcome:"You restore reviewed intent and preserve the audit trail."},
+      {text:"Edit the Deployment back to 3 with kubectl",correct:false,outcome:"You create another unreviewed cluster write and hide the operating-path problem."},
+      {text:"Change Git to replicas: 1",correct:false,outcome:"You turn accidental live state into desired state without validating the business intent."}
+    ]},
+    "synced-degraded":{competency:"Health vs sync",prompt:"Argo reports Synced, but the application is Degraded. What is the strongest next action?",choices:[
+      {text:"Inspect rollout health, logs, metrics, and the last change",correct:true,outcome:"You investigate runtime evidence instead of reapplying identical objects."},
+      {text:"Press Sync repeatedly",correct:false,outcome:"Reapplying the same desired state does not repair a bad application or dependency."},
+      {text:"Disable health checks",correct:false,outcome:"You remove evidence and make unsafe promotion more likely."}
+    ]},
+    "production-promotion":{competency:"Promotion control",prompt:"A canary is Synced and Healthy, but error-rate metrics exceed the production threshold. Promote?",choices:[
+      {text:"Abort promotion and preserve the stable revision",correct:true,outcome:"Runtime evidence controls promotion even when reconciliation succeeded."},
+      {text:"Promote because Argo is Synced",correct:false,outcome:"You confuse desired-state agreement with customer-facing health."},
+      {text:"Turn off the metric gate",correct:false,outcome:"You bypass the control specifically designed to prevent this release."}
+    ]},
+    "runtime-secret":{competency:"Platform boundaries",prompt:"Git and Kubernetes reference the same secret, but authentication fails. Where do you investigate?",choices:[
+      {text:"Secret lifecycle, identity, network path, and application logs",correct:true,outcome:"You follow evidence beyond the desired-state comparison."},
+      {text:"Force an Argo sync",correct:false,outcome:"The objects already match; reconciliation cannot rotate or repair the credential."},
+      {text:"Delete the Deployment",correct:false,outcome:"A restart may hide the symptom without finding the expired or inaccessible secret."}
+    ]}
+  },
+  readiness: ["Git protection","PR review","CI validation","Policy enforcement","RBAC and secrets","Promotion and rollback","Observability and DR"],
   components: {
     "Pull Request":{purpose:"Turns desired-state changes into reviewable proposals.",config:"Required reviewers, CODEOWNERS, validation checks.",failure:"A weak rule lets unreviewed state reach main."},
     "Argo CD":{purpose:"Compares Git desired state with live Kubernetes state.",config:"Application source, destination, project, and sync policy.",failure:"It can faithfully reconcile a bad desired state."},

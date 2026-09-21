@@ -242,5 +242,100 @@
     render();
   }
 
-  window.Dosti = {initAccess, initProtected, initPresentation, initLab, initDemo, initArchitecture, initExplorer, initDiff};
+  function initLearning() {
+    initProtected();
+    const PROGRESS_KEY = "dostikube-learning-progress";
+    const tracks = PLATFORM.learningTracks || [];
+    const challenges = PLATFORM.challenges || {};
+    const readiness = PLATFORM.readiness || [];
+    const allModules = tracks.flatMap((track) => track.modules);
+    const summary = $("#learning-summary");
+    const tabs = $("#track-tabs");
+    const workbench = $("#track-workbench");
+    const checklist = $("#readiness-checklist");
+    let activeTrack = tracks[0] ? tracks[0].id : "";
+    let progress = {completed:[],answers:{},readiness:[]};
+
+    try {
+      progress = {...progress,...JSON.parse(sessionStorage.getItem(PROGRESS_KEY) || "{}")};
+    } catch (_) {
+      sessionStorage.removeItem(PROGRESS_KEY);
+    }
+
+    function save() {
+      sessionStorage.setItem(PROGRESS_KEY,JSON.stringify(progress));
+    }
+
+    function renderSummary() {
+      const correct = Object.entries(progress.answers).filter(([id,index]) => challenges[id] && challenges[id].choices[index] && challenges[id].choices[index].correct).length;
+      const total = allModules.length + Object.keys(challenges).length + readiness.length;
+      const points = progress.completed.length + correct + progress.readiness.length;
+      const percent = total ? Math.round((points / total) * 100) : 0;
+      const weakAreas = Object.entries(progress.answers).filter(([id,index]) => challenges[id] && challenges[id].choices[index] && !challenges[id].choices[index].correct).map(([id]) => challenges[id].competency);
+      summary.innerHTML = `<div class="progress-copy"><span class="eyebrow">Session progress</span><strong>${percent}%</strong><div class="progress-track"><span style="width:${percent}%"></span></div></div><div class="learning-stats"><div><b>${progress.completed.length}/${allModules.length}</b><span>modules</span></div><div><b>${correct}/${Object.keys(challenges).length}</b><span>decisions</span></div><div><b>${progress.readiness.length}/${readiness.length}</b><span>controls</span></div></div><div class="weak-area"><span>Review focus</span><b>${weakAreas.length ? escape([...new Set(weakAreas)].join(" · ")) : "No weak area recorded yet"}</b></div><button class="text-button reset-progress" id="reset-progress">Reset session progress</button>`;
+      $("#reset-progress").addEventListener("click", () => {
+        progress = {completed:[],answers:{},readiness:[]};
+        save();
+        renderAll();
+      });
+    }
+
+    function renderTabs() {
+      tabs.innerHTML = tracks.map((track) => {
+        const complete = track.modules.filter((module) => progress.completed.includes(module.id)).length;
+        return `<button class="track-tab ${track.id === activeTrack ? "active" : ""}" data-track="${escape(track.id)}"><span>${escape(track.role)}</span><b>${escape(track.title)}</b><small>${complete}/${track.modules.length} complete</small></button>`;
+      }).join("");
+    }
+
+    function renderWorkbench() {
+      const track = tracks.find((candidate) => candidate.id === activeTrack);
+      if (!track) return;
+      const challenge = challenges[track.challenge];
+      const selected = progress.answers[track.challenge];
+      const answered = selected !== undefined;
+      workbench.innerHTML = `<div class="track-heading"><div><p class="eyebrow">${escape(track.role)} track</p><h2>${escape(track.title)}</h2><p>${escape(track.summary)}</p></div><span class="track-count">${track.modules.filter((module) => progress.completed.includes(module.id)).length} / ${track.modules.length}</span></div><div class="learning-grid"><div class="learning-modules">${track.modules.map((module,index) => {
+        const done = progress.completed.includes(module.id);
+        return `<article class="learning-module ${done ? "complete" : ""}"><span>${String(index + 1).padStart(2,"0")} · ${escape(module.tool)}</span><h3>${escape(module.title)}</h3><p>${escape(module.outcome)}</p><div><a href="${escape(module.route)}">Open tool →</a><button data-module="${escape(module.id)}">${done ? "✓ Completed" : "Mark complete"}</button></div></article>`;
+      }).join("")}</div><article class="challenge-panel"><p class="eyebrow">Decision challenge · ${escape(challenge.competency)}</p><h3>${escape(challenge.prompt)}</h3><div class="challenge-choices">${challenge.choices.map((choice,index) => `<button class="challenge-choice ${answered && selected === index ? (choice.correct ? "correct" : "wrong") : ""}" data-choice="${index}">${escape(choice.text)}</button>`).join("")}</div>${answered ? `<div class="challenge-outcome ${challenge.choices[selected].correct ? "correct" : "wrong"}"><b>${challenge.choices[selected].correct ? "Strong decision" : "Operational risk"}</b><p>${escape(challenge.choices[selected].outcome)}</p></div>` : `<p class="challenge-hint">Choose the next action before the consequence is revealed.</p>`}</article></div>`;
+      $$('[data-module]',workbench).forEach((button) => button.addEventListener("click", () => {
+        const id = button.dataset.module;
+        progress.completed = progress.completed.includes(id) ? progress.completed.filter((item) => item !== id) : [...progress.completed,id];
+        save();
+        renderAll();
+      }));
+      $$('[data-choice]',workbench).forEach((button) => button.addEventListener("click", () => {
+        progress.answers[track.challenge] = Number(button.dataset.choice);
+        save();
+        renderAll();
+      }));
+    }
+
+    function renderReadiness() {
+      checklist.innerHTML = `<div class="readiness-heading"><div><p class="eyebrow">Production readiness</p><h2>Can the operating model carry production?</h2></div><span>${progress.readiness.length} / ${readiness.length}</span></div><div class="readiness-grid">${readiness.map((item,index) => `<button class="readiness-item ${progress.readiness.includes(index) ? "checked" : ""}" data-readiness="${index}"><span>${progress.readiness.includes(index) ? "✓" : "○"}</span>${escape(item)}</button>`).join("")}</div>`;
+      $$('[data-readiness]',checklist).forEach((button) => button.addEventListener("click", () => {
+        const index = Number(button.dataset.readiness);
+        progress.readiness = progress.readiness.includes(index) ? progress.readiness.filter((item) => item !== index) : [...progress.readiness,index];
+        save();
+        renderAll();
+      }));
+    }
+
+    function renderAll() {
+      renderSummary();
+      renderTabs();
+      renderWorkbench();
+      renderReadiness();
+    }
+
+    tabs.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-track]");
+      if (button) {
+        activeTrack = button.dataset.track;
+        renderAll();
+      }
+    });
+    renderAll();
+  }
+
+  window.Dosti = {initAccess, initProtected, initPresentation, initLab, initDemo, initArchitecture, initExplorer, initDiff, initLearning};
 })();

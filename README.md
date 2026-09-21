@@ -18,10 +18,11 @@ This is intentionally a client-side presentation gate. It is not secure authenti
 - `/architecture/` — inspectable enterprise delivery path and surrounding controls.
 - `/explorer/` — environment-aware GitOps repository and YAML explorer.
 - `/diff/` — desired-versus-actual state diff simulator.
+- `/learn/` — four role-based learning paths, decision challenges, session progress, and a production-readiness assessment.
 
 ## Architecture
 
-The site uses plain HTML, CSS, and JavaScript without a build dependency. `data/talk.js` holds the structured talk. `data/platform.js` holds repository examples, diffs, failure cases, and architecture component details. `assets/core.js` implements the access flow and deterministic interactions. `assets/guard.js` performs the synchronous client-side route check.
+The site uses plain HTML, CSS, and JavaScript without a build dependency. `data/talk.js` holds the structured talk. `data/platform.js` holds repository examples, diffs, failure cases, architecture component details, learning paths, challenges, and readiness controls. `assets/core.js` implements the access flow and deterministic interactions. `assets/guard.js` performs the synchronous client-side route check.
 
 ## Run locally
 
@@ -54,6 +55,7 @@ Real in this static prototype:
 - keyboard and button presentation controls;
 - responsive architecture diagrams and YAML views;
 - deterministic demo, diff, code-explorer, architecture, and incident transitions.
+- session-scoped learning progress, decision feedback, and readiness checks.
 
 Simulated:
 
